@@ -3,37 +3,72 @@
 #include <cuda_runtime.h>
 #include <vector>
 
+// template <typename T>
+// __global__ void rearrange_kernel(
+//     const T* __restrict__ t1,
+//     T* __restrict__ t2,
+//     int N, int B, int H, int C,
+//     int d,
+//     int tensor_subset_size,
+//     int block_size,
+//     int token_size
+// ) {
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     int total_elements = N * B * H * C;
+//     if (idx >= total_elements) return;
+
+//     int curr_n = idx / block_size;
+//     int curr_b = (idx / token_size) % B;
+//     int curr_h = (idx / C) % H;
+//     int curr_c = idx % C;
+
+//     int tp_group = curr_h * d / H;
+//     int dst_h = curr_h % (H / d);
+
+//     int tp_group_offset = curr_n * (block_size / d)
+//                         + curr_b * (H / d) * C
+//                         + dst_h * C
+//                         + curr_c;
+
+//     int dst_pos = tensor_subset_size * tp_group + tp_group_offset;
+
+//     t2[dst_pos] = t1[idx];
+// }
+
 template <typename T>
 __global__ void rearrange_kernel(
-    const T* __restrict__ t1,
-    T* __restrict__ t2,
-    int N, int B, int H, int C,
-    int d,
+    const T* __restrict__ t1_ptr, 
+    T* __restrict__ t2_ptr,
+    int N, int B, int H, int C, int d,
     int tensor_subset_size,
     int block_size,
-    int token_size
-) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int total_elements = N * B * H * C;
-    if (idx >= total_elements) return;
+    int token_size)
+{
+    int BLOCK_SIZE = blockDim.x;
+    int pid = blockIdx.x;
+    int tid = threadIdx.x;
 
-    int curr_n = idx / block_size;
-    int curr_b = (idx / token_size) % B;
-    int curr_h = (idx / C) % H;
-    int curr_c = idx % C;
+    int offset = pid * BLOCK_SIZE + tid;
+
+    if (offset >= N * B * H * C) return;
+
+    int curr_n = offset / block_size;
+    int curr_b = (offset / token_size) % B;
+    int curr_h = (offset / C) % H;
+    int curr_c = offset % C;
+
+    int src_pos = offset;
 
     int tp_group = curr_h * d / H;
     int dst_h = curr_h % (H / d);
-
-    int tp_group_offset = curr_n * (block_size / d)
-                        + curr_b * (H / d) * C
-                        + dst_h * C
-                        + curr_c;
+    int tp_group_offset = curr_n * (block_size / d) + curr_b * (H / d) * C + dst_h * C + curr_c;
 
     int dst_pos = tensor_subset_size * tp_group + tp_group_offset;
+    
 
-    t2[dst_pos] = t1[idx];
+    t2_ptr[dst_pos] = t1_ptr[src_pos];
 }
+
 
 // C++ 接口模板函数
 template <typename T>
