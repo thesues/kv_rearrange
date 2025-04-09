@@ -116,7 +116,7 @@ void launch_rearrange_tensors(torch::Tensor t1, torch::Tensor t2, int d) {
     int token_size = H * C;
 
 
-    int threads_per_block = 1024;
+    int threads_per_block = 512;
     int blocks = (total_elements + threads_per_block - 1) / threads_per_block;
 
     int h_div_d = H / d;
