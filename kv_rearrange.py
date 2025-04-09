@@ -72,10 +72,8 @@ def rearrange_kernel_write(
 
     dst_pos = tensor_subset_size * tp_group + tp_group_offset
 
-    #FIXME: This is a hack to avoid the issue with the compiler
-    src_pos = curr_n * block_size + curr_b * token_size + curr_h * C + curr_c
-
     tl.store(t2_ptr + dst_pos, tl.load(t1_ptr + src_pos, mask), mask=mask)
+
 
 
 
@@ -182,12 +180,13 @@ def benchmark():
     torch.cuda.synchronize()
     start = time.perf_counter()
     rearrange_tensors_to_dram(t1, t4, d)
+    torch.cuda.synchronize()
     end = time.perf_counter()
     print(f"pytorch rearrange took {end - start:.4f} seconds")
 
 
 
-#warmup
+# warmup
 for i in range(10):
     test()
 
